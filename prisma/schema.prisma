@@ -1,0 +1,110 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ADMIN
+  GESTOR
+  TECNICO
+  FINANCEIRO
+}
+
+enum StatusOS {
+  ABERTA
+  EM_ANDAMENTO
+  AGUARDANDO_PECA
+  CONCLUIDA
+  CANCELADA
+}
+
+
+model Usuario {
+  id            String          @id @default(uuid())
+  nome          String
+  email         String          @unique
+  senhaHash     String
+  cpf           String          @unique
+  role          Role            @default(TECNICO)
+  ativo         Boolean         @default(true)
+  criadoEm      DateTime        @default(now())
+  
+  ordensServico OrdemServico[]  @relation("TecnicoOS")
+  registrosPonto RegistroPonto[]
+  logsAuditoria LogAuditoria[]
+}
+
+model Cliente {
+  id            String         @id @default(uuid())
+  nomeRazao     String
+  cpfCnpj       String         @unique
+  email         String
+  telefone      String
+  endereco      String
+  cidade        String
+  estado        String         // Ex: "PA" (SEFAZ-PA)
+  equipamentos  Equipamento[]
+  ordensServico OrdemServico[]
+  criadoEm      DateTime       @default(now())
+}
+
+model Equipamento {
+  id            String         @id @default(uuid())
+  qrCodeId      String         @unique @default(uuid())
+  nomeAparelho  String         // Ex: Ar Condicionado Split 12000 BTU
+  marca         String
+  modelo        String
+  capacidadeBtu Int?
+  localizacao   String         
+  clienteId     String
+  cliente       Cliente        @relation(fields: [clienteId], references: [id])
+  ordensServico OrdemServico[]
+  manutencoes   PMOCItem[]
+}
+
+model OrdemServico {
+  id            String       @id @default(uuid())
+  numeroOS      Int          @unique @default(autoincrement())
+  status        StatusOS     @default(ABERTA)
+  descricao     String
+  valorTotal    Decimal      @db.Decimal(10, 2)
+  clienteId     String
+  cliente       Cliente      @relation(fields: [clienteId], references: [id])
+  tecnicoId     String
+  tecnico       Usuario      @relation("TecnicoOS", fields: [tecnicoId], references: [id])
+  equipamentoId String?
+  equipamento   Equipamento? @relation(fields: [equipamentoId], references: [id])
+  criadoEm      DateTime     @default(now())
+}
+
+model PMOCItem {
+  id            String      @id @default(uuid())
+  equipamentoId String
+  equipamento   Equipamento @relation(fields: [equipamentoId], references: [id])
+  tarefa        String      // Ex: Limpeza e higienização de filtros
+  periodicidade String      // Mensal, Trimestral
+  proximaData   DateTime
+}
+
+model RegistroPonto {
+  id            String   @id @default(uuid())
+  usuarioId     String
+  usuario       Usuario  @relation(fields: [usuarioId], references: [id])
+  timestamp     DateTime @default(now())
+  latitude      Float?
+  longitude     Float?
+  tipo          String   // ENTRADA, SAIDA
+}
+
+model LogAuditoria {
+  id        String   @id @default(uuid())
+  usuarioId String
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
+  acao      String
+  ip        String
+  data      DateTime @default(now())
+}
